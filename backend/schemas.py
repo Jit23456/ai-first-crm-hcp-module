@@ -53,3 +53,4 @@ class ChatResponse(BaseModel):
     reply: str
     interaction: Optional[dict] = None      # the interaction the agent created/edited, if any
     tool_used: Optional[str] = None         # which LangGraph tool ran (for the demo)
+    deleted_id: Optional[int] = None        # ID of the interaction the agent deleted, if any

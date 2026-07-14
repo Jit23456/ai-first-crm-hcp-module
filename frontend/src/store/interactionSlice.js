@@ -53,6 +53,7 @@ const initialState = {
   status: "idle",
   chatStatus: "idle",
   error: null,
+  removeError: null,
 };
 
 const interactionSlice = createSlice({
@@ -90,6 +91,10 @@ const interactionSlice = createSlice({
       // remove
       .addCase(removeInteraction.fulfilled, (state, action) => {
         state.items = state.items.filter((i) => i.id !== action.payload);
+        state.removeError = null;
+      })
+      .addCase(removeInteraction.rejected, (state, action) => {
+        state.removeError = action.error.message;
       })
       // chat (agent)
       .addCase(chat.pending, (state) => {
@@ -97,13 +102,17 @@ const interactionSlice = createSlice({
       })
       .addCase(chat.fulfilled, (state, action) => {
         state.chatStatus = "succeeded";
-        const { reply, interaction, tool_used } = action.payload;
+        const { reply, interaction, tool_used, deleted_id } = action.payload;
         state.messages.push({ role: "assistant", text: reply, tool: tool_used });
         // If the agent created/edited an interaction, reflect it in the list.
         if (interaction) {
           const idx = state.items.findIndex((i) => i.id === interaction.id);
           if (idx !== -1) state.items[idx] = interaction;
           else state.items.unshift(interaction);
+        }
+        // If the agent deleted an interaction, drop it from the list.
+        if (deleted_id != null) {
+          state.items = state.items.filter((i) => i.id !== deleted_id);
         }
       })
       .addCase(chat.rejected, (state, action) => {

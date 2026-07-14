@@ -109,4 +109,5 @@ def chat(payload: schemas.ChatRequest):
         reply=result["reply"],
         interaction=result["interaction"],
         tool_used=result["tool_used"],
+        deleted_id=result["deleted_id"],
     )

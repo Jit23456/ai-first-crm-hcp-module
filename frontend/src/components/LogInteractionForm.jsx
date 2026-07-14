@@ -44,10 +44,12 @@ export default function LogInteractionForm() {
       samples_distributed: toList(form.samples_distributed),
       follow_up_actions: toList(form.follow_up_actions),
     };
-    await dispatch(addInteraction(payload));
-    setForm(EMPTY);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    const result = await dispatch(addInteraction(payload));
+    if (addInteraction.fulfilled.match(result)) {
+      setForm(EMPTY);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    }
   };
 
   return (
@@ -174,6 +176,11 @@ export default function LogInteractionForm() {
 
       <div className="form-footer">
         {saved && <span className="saved-note">Interaction saved.</span>}
+        {status === "failed" && !saved && (
+          <span className="saved-note" style={{ color: "#c0392b" }}>
+            Could not save — is the backend running on port 8000?
+          </span>
+        )}
         <button
           className="btn btn-primary"
           onClick={handleSubmit}

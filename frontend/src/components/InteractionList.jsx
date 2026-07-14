@@ -9,6 +9,7 @@ import { removeInteraction, editInteraction } from "../store/interactionSlice";
 export default function InteractionList() {
   const dispatch = useDispatch();
   const items = useSelector((s) => s.interactions.items);
+  const removeError = useSelector((s) => s.interactions.removeError);
 
   if (!items.length) {
     return (
@@ -37,6 +38,12 @@ export default function InteractionList() {
         <h2>Logged interactions</h2>
         <span className="card-sub">{items.length} total</span>
       </div>
+
+      {removeError && (
+        <p className="empty-note" style={{ color: "#c0392b" }}>
+          Could not delete — is the backend running on port 8000?
+        </p>
+      )}
 
       <div className="table">
         {items.map((it) => (

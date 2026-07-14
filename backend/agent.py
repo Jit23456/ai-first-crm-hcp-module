@@ -22,13 +22,14 @@ HOW IT WORKS (LangGraph):
     LangGraph handles the state (message history) and the routing between the
     "reason" step and the "act" (tool) step.
 
-THE 5 TOOLS (assignment requires min. 5, two of which are mandatory):
+THE 6 TOOLS (assignment requires min. 5, two of which are mandatory):
     1. log_interaction     (MANDATORY) - create a new interaction; LLM extracts
                                           entities + writes an AI summary
     2. edit_interaction    (MANDATORY) - modify an already-logged interaction
     3. list_interactions               - search / retrieve past interactions
     4. suggest_follow_ups              - LLM proposes next-step actions
     5. analyze_sentiment               - LLM classifies HCP sentiment from notes
+    6. delete_interaction              - remove a logged interaction by ID
 """
 
 import os
@@ -57,12 +58,13 @@ llm = ChatGroq(
 
 # We track which tool ran last, purely so the /chat endpoint can report it in
 # the demo ("tool_used"). In a bigger app you'd pull this from the run trace.
-_LAST_TOOL_USED = {"name": None, "interaction": None}
+_LAST_TOOL_USED = {"name": None, "interaction": None, "deleted_id": None}
 
 
 def _reset_tool_tracker():
     _LAST_TOOL_USED["name"] = None
     _LAST_TOOL_USED["interaction"] = None
+    _LAST_TOOL_USED["deleted_id"] = None
 
 
 # ---------------------------------------------------------------------------
@@ -272,6 +274,31 @@ Note: {text}"""
 
 
 # ---------------------------------------------------------------------------
+# TOOL 6: Delete Interaction
+# ---------------------------------------------------------------------------
+@tool
+def delete_interaction(interaction_id: int) -> str:
+    """Delete a logged interaction by its ID.
+    Use this when the rep asks to remove/delete an interaction, e.g.
+    'delete interaction 3' or 'remove the entry for Dr. Smith' (look up the ID
+    with list_interactions first if you only have a name)."""
+    db = SessionLocal()
+    try:
+        interaction = db.query(Interaction).filter(Interaction.id == interaction_id).first()
+        if not interaction:
+            return f"No interaction found with ID {interaction_id}."
+        hcp_name = interaction.hcp_name
+        db.delete(interaction)
+        db.commit()
+    finally:
+        db.close()
+
+    _LAST_TOOL_USED["name"] = "delete_interaction"
+    _LAST_TOOL_USED["deleted_id"] = interaction_id
+    return f"Deleted interaction #{interaction_id} ({hcp_name})."
+
+
+# ---------------------------------------------------------------------------
 # Build the LangGraph agent
 # ---------------------------------------------------------------------------
 TOOLS = [
@@ -280,6 +307,7 @@ TOOLS = [
     list_interactions,
     suggest_follow_ups,
     analyze_sentiment,
+    delete_interaction,
 ]
 
 SYSTEM_PROMPT = """You are the AI assistant inside an AI-first pharma CRM, helping
@@ -293,6 +321,8 @@ Rules:
 - Use list_interactions to look things up.
 - Use suggest_follow_ups when asked what to do next.
 - Use analyze_sentiment to gauge how an interaction went.
+- Use delete_interaction to remove a logged interaction (you need the ID; if
+  you only have a name, find the ID with list_interactions first).
 - Always confirm what you did in plain, friendly language."""
 
 # create_react_agent wires the LLM + tools into a runnable LangGraph graph.
@@ -310,4 +340,5 @@ def run_agent(message: str) -> dict:
         "reply": final_message,
         "tool_used": _LAST_TOOL_USED["name"],
         "interaction": _LAST_TOOL_USED["interaction"],
+        "deleted_id": _LAST_TOOL_USED["deleted_id"],
     }
